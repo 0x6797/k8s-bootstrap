@@ -1,0 +1,42 @@
+---
+# tasks file for aws-iam
+- name: aws-iam | Create IAM Policies for kubernetes master
+  iam_managed_policy:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    policy_name: "{{ env }}-kubernetes-policy-master"
+    policy: "{{ lookup('file', 'kubernetes-master-policy.json') }}"
+    state: present
+  register: aws_iam_policy_master
+
+- name: aws-iam | Create IAM Policies for kubernetes minion
+  iam_managed_policy:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    policy_name: "{{ env }}-kubernetes-policy-minion"
+    policy: "{{ lookup('file', 'kubernetes-minion-policy.json') }}"
+    state: present
+  register: aws_iam_policy_minion
+
+- name: aws-iam | Create IAM Role for kubernetes master
+  iam_role:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ env }}-kubernetes-role-master"
+    assume_role_policy_document: "{{ lookup('file', 'kubernetes-master-role.json') }}"
+    managed_policy:
+      - "{{ aws_iam_policy_master.policy.arn }}"
+
+- name: aws-iam | Create IAM Role for kubernetes minion
+  iam_role:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ env }}-kubernetes-role-minion"
+    assume_role_policy_document: "{{ lookup('file', 'kubernetes-minion-role.json') }}"
+    managed_policy:
+      - "{{ aws_iam_policy_minion.policy.arn }}"
+

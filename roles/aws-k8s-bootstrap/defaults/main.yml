@@ -1,0 +1,37 @@
+---
+# defaults file for aws-k8s-bootstrap
+aws_k8s_bootstrap_module_name: "aws_k8s_bootstrap"
+aws_k8s_default_ami: ami-e0ba5c83
+aws_k8s_bootstrap:
+  key_pair: ""
+  vpc:
+    name: aws_k8s_bootstrap_vpc
+    cidr_block: 10.10.0.0/16
+  igw:
+    name: aws_k8s_bootstrap_igw
+  subnets:
+    - name: "Public subnet on {{ aws_k8s_bootstrap_module_name }}"
+      cidr: 10.10.16.0/20
+      az:
+      map_public: yes
+  security_groups:
+    - name: ""
+      description: ""
+      rules:
+        - proto: tcp
+          prots:
+            - 22
+          cidr_ip:
+            - 10.10.0.0/16
+          group_desc: ssh
+  instances:
+    - name: ""
+      cidr: 10.10.16.0/20
+      count: 1
+      key_pair: ""
+      ami: "{{ aws_k8s_default_ami }}"
+      instance_type: t2.micro
+      profile: ""
+      security_group: ""
+      kubespray_role: ""
+      volume_size: 8

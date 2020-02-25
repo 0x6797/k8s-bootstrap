@@ -1,0 +1,114 @@
+---
+# tasks file for aws-credentials
+- name: Debug print preset aws_access_key_id
+  debug:
+    var: aws_access_key_id
+    verbosity: 3
+
+- name: Debug print preset aws_secret_access_key
+  debug:
+    var: aws_secret_access_key
+    verbosity: 3
+
+- name: Debug print preset aws_credentials_access_key_id_default
+  debug:
+    var: aws_credentials_access_key_id_default
+    verbosity: 3
+
+- name: Debug print preset aws_credentials_secret_access_key_default
+  debug:
+    var: aws_credentials_secret_access_key_default
+    verbosity: 3
+
+- name: Define aws_access_key_id if not defined
+  set_fact:
+    aws_access_key_id: ""
+  when: not aws_access_key_id
+
+- name: Define aws_access_key_id if not defined
+  set_fact:
+    aws_secret_access_key: ""
+  when: not aws_secret_access_key
+
+- name: Check if exists $HOME/.aws/credentials
+  stat: path=$HOME/.aws/credentials
+  register: aws_credentials_file
+  when:
+    - ((aws_credentials_access_key_id_default == "") or (aws_credentials_secret_access_key_default == ""))
+    - ((aws_access_key_id == "") or (aws_secret_access_key == ""))
+
+- name: Debug print aws_credentials_file
+  debug:
+    var: aws_credentials_file
+    verbosity: 3
+
+- name: Get Access Key from AWS Config
+  shell: "cat {{ aws_credentials_file.stat.path }} | awk 'NR == 2 { print $3 }'"
+  register: aws_credentials_access_key_id
+  when:
+    - aws_credentials_file is not skipped
+    - aws_credentials_file.stat.exists == True
+    - aws_credentials_access_key_id_default == ""
+
+- name: Get Secret Access Key from AWS Config
+  shell: "cat {{ aws_credentials_file.stat.path }} | awk 'NR == 3 { print $3 }'"
+  register: aws_credentials_secret_access_key
+  when:
+    - aws_credentials_file is not skipped
+    - aws_credentials_file.stat.exists == True
+    - aws_credentials_secret_access_key_default == ""
+
+- name: Debug print aws_credentials_access_key_id.stdout
+  debug:
+    var: aws_credentials_access_key_id.stdout
+    verbosity: 3
+
+- name: Debug print aws_secret_access_key.stdout
+  debug:
+    var: aws_credentials_secret_access_key.stdout
+    verbosity: 3
+
+- name: Set AWS credentials Access Key ID to fact from credentials file
+  set_fact:
+    aws_access_key_id: "{{ aws_credentials_access_key_id.stdout }}"
+  when:
+    - aws_credentials_access_key_id is not skipped
+    - aws_access_key_id == ""
+    - aws_credentials_access_key_id_default == ""
+
+- name: Set AWS credentials Secret Access Key to fact from credentials file
+  set_fact:
+    aws_secret_access_key: "{{ aws_credentials_secret_access_key.stdout }}"
+  when:
+    - aws_credentials_secret_access_key is not skipped
+    - aws_secret_access_key == ""
+    - aws_credentials_secret_access_key_default == ""
+
+- name: Set AWS credentials Access Key ID to fact from environment variable
+  set_fact:
+    aws_access_key_id : "{{ aws_credentials_access_key_id_default }}"
+  when:
+    - aws_access_key_id == ""
+    - aws_credentials_access_key_id is skipped
+
+- name: Set AWS credentials Secret Access Key to fact from environment variable
+  set_fact:
+    aws_secret_access_key: "{{ aws_credentials_secret_access_key_default }}"
+  when:
+    - aws_secret_access_key == ""
+    - aws_credentials_access_key_id is skipped
+
+- name: Debug print preset aws_access_key_id
+  debug:
+    var: aws_access_key_id
+    verbosity: 1
+
+- name: Debug print preset aws_secret_access_key
+  debug:
+    var: aws_secret_access_key
+    verbosity: 1
+
+- name: Fail if not set aws_access_key_id and aws_secret_access_key
+  fail:
+    msg: "Failed to not set aws_access_key_id and aws_secret_access_key. Check 'AWS_ACCESS_KEY_ID' and 'AWS_SECRET_ACCESS_KEY' environment variables or execute `aws configure`."
+  when: (aws_access_key_id == "" or aws_secret_access_key == "")

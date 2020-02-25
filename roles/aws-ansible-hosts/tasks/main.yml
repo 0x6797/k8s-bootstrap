@@ -1,0 +1,12 @@
+---
+# tasks file for aws-ansible-hosts
+- name: aws-ansible-hosts | Create Ansible Hosts file
+  template:
+    src: hosts.ini.j2
+    dest: "{{ playbook_dir }}/inventory/aws/{{ aws_default_region }}-{{ env }}.ini"
+
+- name: aws-ansible-hosts | Crate Dynamic Hosts file
+  template:
+    src: kubespray-aws-inventory.py.j2
+    dest: "{{ playbook_dir }}/inventory/aws/{{ aws_default_region }}-{{ env }}.py"
+    mode: 0755

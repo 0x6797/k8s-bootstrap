@@ -1,0 +1,85 @@
+---
+# tasks file for bastion-kubespray
+- name: bastion-kubespray | Ensure to install git (YUM)
+  yum:
+    name: git
+    state: latest
+  become: yes
+  when:
+    - ansible_pkg_mgr == "yum"
+
+- name: bastion-kubespray | Ensure to install python (YUM)
+  yum:
+    name: "{{ item }}"
+    state: latest
+  become: yes
+  when:
+    - ansible_pkg_mgr == "yum"
+  with_items:
+    - python
+    - python2-pip
+
+- name: bastion-kubespray | Remove kubespray if presents
+  file:
+    path: "{{ bastion_kubespray_dir }}"
+    state: absent
+
+- name: bastion-kubespray | Clone kubespray from GitHub
+  git:
+    repo: "{{ bastion_kubespray_repo }}"
+    dest: "{{ bastion_kubespray_dir }}"
+
+- name: bastion-kubespray | Ensure to install python modules
+  shell: "pip install --user -r requirements.txt"
+  args:
+    chdir: "{{ bastion_kubespray_dir }}"
+
+- name: bastion-kubespray | Ensure to install boto3
+  pip:
+    name: boto3
+    extra_args: "--user"
+  when: provider == "aws"
+
+- name: bastion-kubespray | Copy AWS Credentials
+  copy:
+    src: ~/.aws
+    dest: ~/
+  when: provider == "aws"
+
+- name: bastion-kubespray | Copy hosts.ini
+  copy:
+    src: "{{ playbook_dir }}/inventory/{{ provider }}/{{ region }}-{{ env }}.ini"
+    dest: "{{ bastion_kubespray_dir }}/inventory/hosts.ini"
+
+- name: bastion-kubespray | Copy hosts.py
+  copy:
+    src: "{{ playbook_dir }}/inventory/{{ provider }}/{{ region }}-{{ env }}.py"
+    dest: "{{ bastion_kubespray_dir }}/inventory/hosts.py"
+    mode: 0755
+
+- name: bastion-kubespray | Ensure to exist group_vars directory
+  file:
+    path: "{{ bastion_kubespray_dir }}/inventory/group_vars"
+    state: directory
+
+- name: bastion-kubespray | Copy ansible.cfg
+  copy:
+    src: files/ansible.cfg
+    dest: "{{ bastion_kubespray_dir }}/ansible.cfg"
+
+- name: bastion-kubespray | Copy bootstrap.sh (patch)
+  copy:
+    src: files/bootstrap.sh
+    dest: "{{ bastion_kubespray_dir }}/roles/bootstrap-os/files/bootstrap.sh"
+
+- name: bastion-kubespray | Copy all.yml
+  template:
+    src: templates/all.yml.j2
+    dest: "{{ bastion_kubespray_dir }}/inventory/group_vars/all.yml"
+
+- name: bastion-kubespray | Copy k8s-cluster.yml
+  copy:
+    src: files/k8s-cluster.yml.j2
+    dest: "{{ bastion_kubespray_dir }}/inventory/group_vars/k8s-cluster.yml"
+
+

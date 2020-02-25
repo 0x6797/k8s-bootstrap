@@ -1,0 +1,25 @@
+---
+- hosts: bastion
+  gather_facts: no
+  tasks:
+    - name: bastion-ssh | Wait for SSH port up
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ ansible_port | default(22) }}"
+        state: started
+        delay: 1
+        timeout: 600
+      delegate_to: 127.0.0.1
+
+- hosts: bastion
+  gather_facts: yes
+  vars:
+    env: "{{ lookup('env', 'ENV') }}"
+    region: "{{ lookup('env', 'REGION') }}"
+    provider: "{{ lookup('env', 'PROVIDER') }}"
+    secret_key_name: "{{ lookup('env', 'SECRET_KEY_NAME') }}"
+  roles:
+    - bastion-ssh
+    - bastion-kubespray
+    - nvim
+    - bastion-kubectl

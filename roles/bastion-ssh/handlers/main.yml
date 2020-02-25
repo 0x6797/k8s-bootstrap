@@ -1,0 +1,7 @@
+---
+# handlers file for bastion-ssh
+- name: Restart sshd
+  service:
+    name: sshd
+    state: restarted
+  become: yes

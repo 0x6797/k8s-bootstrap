@@ -1,0 +1,912 @@
+---
+# tasks file for aws-k8s-bootstrap
+- name: pip install botocore
+  pip:
+    name: botocore
+    extra_args: --user
+
+- name: pip install boto
+  pip:
+    name: boto
+    extra_args: --user
+
+- name: pip install boto3
+  pip:
+    name: boto3
+    extra_args: --user
+
+- name: pip install Jinja2
+  pip:
+    name: Jinja2
+    extra_args: --user --upgrade
+
+- name: Get my public IPv4 address
+  shell: "curl ifconfig.io"
+  args:
+    warn: no
+  register: aws_k8s_bootstrap_curl_result
+
+- name: Set public IPv4 address
+  set_fact:
+    aws_k8s_bootstrap_public_ipv4: "{{ aws_k8s_bootstrap_curl_result.stdout }}"
+  when:
+    - aws_k8s_bootstrap_curl_result.rc == 0
+
+- name: Create VPC on AWS EC2
+  ec2_vpc_net:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "[{{ env }}]:{{ aws_k8s_bootstrap.vpc.name }}"
+    cidr_block: "{{ aws_k8s_bootstrap.vpc.cidr_block }}"
+    dns_hostnames: yes
+    dns_support: yes
+    multi_ok: no
+    tags:
+      Name: "[{{ env }}]:{{ aws_k8s_bootstrap.vpc.name }}"
+      Environment: "{{ env }}"
+      Module: "{{ aws_k8s_bootstrap_module_name }}"
+  register: aws_k8s_bootstrap_vpc_result
+
+- name: Debug print aws_k8s_bootstrap_vpc_result
+  debug:
+    var: aws_k8s_bootstrap_vpc_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_vpc_result": {
+    #         "changed": true,
+    #         "failed": false,
+    #         "vpc": {
+    #             "cidr_block": "10.10.0.0/16",
+    #             "cidr_block_association_set": [
+    #                 {
+    #                     "association_id": "vpc-cidr-assoc-*****************",
+    #                     "cidr_block": "10.10.0.0/16",
+    #                     "cidr_block_state": {
+    #                         "state": "associated"
+    #                     }
+    #                 }
+    #             ],
+    #             "classic_link_enabled": false,
+    #             "dhcp_options_id": "dopt-e1b*****",
+    #             "id": "vpc-*****************",
+    #             "instance_tenancy": "default",
+    #             "is_default": false,
+    #             "state": "available",
+    #             "tags": {
+    #                 "Module": "aws_k8s_bootstrap",
+    #                 "Name": "[ ******** ] ********"
+    #             }
+    #         }
+    #     }
+    # }
+
+- name: Create Internet Gateway
+  ec2_vpc_igw:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_k8s_bootstrap_vpc_result.vpc.id }}"
+    tags:
+      Name: "[{{ env }}]:{{ aws_k8s_bootstrap.igw.name }}"
+      Environment: "{{ env }}"
+      Module: "{{ aws_k8s_bootstrap_module_name }}"
+  register: aws_k8s_bootstrap_igw_result
+
+- name: Debug print aws_k8s_bootstrap_igw_result
+  debug:
+    var: aws_k8s_bootstrap_igw_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_igw_result": {
+    #         "changed": true,
+    #         "failed": false,
+    #         "gateway_id": "igw-*****************",
+    #         "tags": {
+    #             "Name": "*********",
+    #             "Module": "aws_k8s_bootstrap"
+    #         },
+    #         "vpc_id": "vpc-*****************"
+    #     }
+    # }
+
+
+- name: Create Subnets
+  ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_k8s_bootstrap_vpc_result.vpc.id }}"
+    az: "{{ item.az }}"
+    cidr: "{{ item.cidr }}"
+    map_public: "{{ item.map_public }}"
+    tags:
+      Name: "[{{ env }}]:{{ item.name }}"
+      Environment: "{{ env }}"
+      Module: "{{ aws_k8s_bootstrap_module_name }}"
+  with_items: "{{ aws_k8s_bootstrap.subnets }}"
+  register: aws_k8s_bootstrap_subnets_result
+
+- name: Debug print aws_k8s_bootstrap_subnets_result
+  debug:
+    var: aws_k8s_bootstrap_subnets_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_subnets_result": {
+    #         "changed": true,
+    #         "msg": "All items completed",
+    #         "results": [
+    #             {
+    #                 "_ansible_ignore_errors": null,
+    #                 "_ansible_item_label": {
+    #                     "az": "**-****-**",
+    #                     "cidr": "10.10.16.0/20",
+    #                     "map_public": true,
+    #                     "name": "********"
+    #                 },
+    #                 "_ansible_item_result": true,
+    #                 "_ansible_no_log": false,
+    #                 "_ansible_parsed": true,
+    #                 "changed": true,
+    #                 "failed": false,
+    #                 "invocation": {
+    #                     "module_args": {
+    #                         "assign_instances_ipv6": false,
+    #                         "aws_access_key": "********************",
+    #                         "aws_secret_key": "VALUE_SPECIFIED_IN_NO_LOG_PARAMETER",
+    #                         "az": "**-****-**",
+    #                         "cidr": "10.10.16.0/20",
+    #                         "ec2_url": null,
+    #                         "ipv6_cidr": "",
+    #                         "map_public": true,
+    #                         "profile": null,
+    #                         "purge_tags": true,
+    #                         "region": "**-****-*",
+    #                         "security_token": null,
+    #                         "state": "present",
+    #                         "tags": {
+    #                             "Module": "aws_k8s_bootstrap",
+    #                             "Name": "********"
+    #                         },
+    #                         "validate_certs": true,
+    #                         "vpc_id": "vpc-*****************",
+    #                         "wait": true,
+    #                         "wait_timeout": 300
+    #                     }
+    #                 },
+    #                 "item": {
+    #                     "az": "**-****-**",
+    #                     "cidr": "10.10.16.0/20",
+    #                     "map_public": true,
+    #                     "name": "********"
+    #                 },
+    #                 "subnet": {
+    #                     "assign_ipv6_address_on_creation": false,
+    #                     "availability_zone": "**-****-**",
+    #                     "available_ip_address_count": 4091,
+    #                     "cidr_block": "10.10.16.0/20",
+    #                     "default_for_az": false,
+    #                     "id": "subnet-*****************",
+    #                     "ipv6_association_id": "",
+    #                     "ipv6_cidr_block": "",
+    #                     "ipv6_cidr_block_association_set": [],
+    #                     "map_public_ip_on_launch": true,
+    #                     "state": "available",
+    #                     "tags": {
+    #                         "Module": "aws_k8s_bootstrap",
+    #                         "Name": "********"
+    #                     },
+    #                     "vpc_id": "vpc-*****************"
+    #                 }
+    #             },
+    #             ...
+    #         ]
+    #     }
+    # }
+
+- name: Create Public Route Table
+  ec2_vpc_route_table:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_k8s_bootstrap_vpc_result.vpc.id }}"
+    subnets: '{{ aws_k8s_bootstrap_subnets_result.results | selectattr("item.map_public", "defined") | selectattr("item.map_public", "equalto", true) | map(attribute = "subnet.id") | list }}'
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ aws_k8s_bootstrap_igw_result.gateway_id }}"
+    tags:
+      Name: "[{{ env }}]:aws-k8s-public-route-table"
+      Environment: "{{ env }}"
+      Visibility: "public"
+      Module: "{{ aws_k8s_bootstrap_module_name }}"
+  register: aws_k8s_bootstrap_public_route_result
+
+- name: Debug print aws_k8s_bootstrap_public_route_result
+  debug:
+    var: aws_k8s_bootstrap_public_route_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_public_route_result": {
+    #         "changed": true,
+    #         "failed": false,
+    #         "route_table": {
+    #             "associations": [
+    #                 {
+    #                     "main": false,
+    #                     "route_table_association_id": "rtbassoc-*****************",
+    #                     "route_table_id": "rtb-*****************",
+    #                     "subnet_id": "subnet-*****************"
+    #                 },
+    #                 ...
+    #             ],
+    #             "id": "rtb-*****************",
+    #             "propagating_vgws": [],
+    #             "route_table_id": "rtb-*****************",
+    #             "routes": [
+    #                 {
+    #                     "destination_cidr_block": "10.10.0.0/16",
+    #                     "gateway_id": "local",
+    #                     "origin": "CreateRouteTable",
+    #                     "state": "active"
+    #                 },
+    #                 {
+    #                     "destination_cidr_block": "0.0.0.0/0",
+    #                     "gateway_id": "igw-*****************",
+    #                     "origin": "CreateRoute",
+    #                     "state": "active"
+    #                 }
+    #             ],
+    #             "tags": {
+    #                 "Module": "aws_k8s_bootstrap"
+    #             },
+    #             "vpc_id": "vpc-*****************"
+    #         }
+    #     }
+    # }
+
+- name: Create Private Route Table
+  ec2_vpc_route_table:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_k8s_bootstrap_vpc_result.vpc.id }}"
+    subnets: '{{ aws_k8s_bootstrap_subnets_result.results | selectattr("item.map_public", "defined") | selectattr("item.map_public", "equalto", false) | map(attribute = "subnet.id") | list }}'
+    tags:
+      Name: "[{{ env }}]:aws-k8s-private-route-table"
+      Environment: "{{ env }}"
+      Visibility: "internal"
+      Module: "{{ aws_k8s_bootstrap_module_name }}"
+  register: aws_k8s_bootstrap_private_route_result
+
+- name: Debug print aws_k8s_bootstrap_private_route_result
+  debug:
+    var: aws_k8s_bootstrap_private_route_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_private_route_result": {
+    #         "changed": true,
+    #         "failed": false,
+    #         "route_table": {
+    #             "associations": [
+    #                 {
+    #                     "main": false,
+    #                     "route_table_association_id": "rtbassoc-*****************",
+    #                     "route_table_id": "rtb-*****************",
+    #                     "subnet_id": "subnet-*****************"
+    #                 },
+    #                 ...
+    #             ],
+    #             "id": "rtb-*****************",
+    #             "propagating_vgws": [],
+    #             "route_table_id": "rtb-*****************",
+    #             "routes": [
+    #                 {
+    #                     "destination_cidr_block": "10.10.0.0/16",
+    #                     "gateway_id": "local",
+    #                     "origin": "CreateRouteTable",
+    #                     "state": "active"
+    #                 }
+    #             ],
+    #             "tags": {
+    #                 "Module": "aws_k8s_bootstrap"
+    #             },
+    #             "vpc_id": "vpc-*****************"
+    #         }
+    #     }
+    # }
+
+- name: Create Security Groups
+  ec2_group:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_k8s_bootstrap_vpc_result.vpc.id }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    rules: "{{ item.rules }}"
+    tags:
+      Name: "[{{ env }}]:{{ item.name }}"
+      Environment: "{{ env }}"
+      Module: "{{ aws_k8s_bootstrap_module_name }}"
+  with_items: "{{ aws_k8s_bootstrap.security_groups }}"
+  register: aws_k8s_bootstrap_sg_result
+
+- name: Debug print aws_k8s_bootstrap_sg_result
+  debug:
+    var: aws_k8s_bootstrap_sg_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_sg_result": {
+    #         "changed": true,
+    #         "msg": "All items completed",
+    #         "results": [
+    #             {
+    #                 "_ansible_ignore_errors": null,
+    #                 "_ansible_item_label": {
+    #                     "description": "********"
+    #                     "name": "********"
+    #                     "rules": [
+    #                         {
+    #                             "cidr_ip": [
+    #                                 "***.***.***.***/**"
+    #                             ],
+    #                             "group_desc": "ssh",
+    #                             "ports": [
+    #                                 ****
+    #                             ],
+    #                             "proto": "tcp"
+    #                         }
+    #                     ]
+    #                 },
+    #                 "_ansible_item_result": true,
+    #                 "_ansible_no_log": false,
+    #                 "_ansible_parsed": true,
+    #                 "changed": true,
+    #                 "description": "********",
+    #                 "failed": false,
+    #                 "group_id": "sg-*****************",
+    #                 "group_name": "********",
+    #                 "invocation": {
+    #                     "module_args": {
+    #                         "aws_access_key": "********************",
+    #                         "aws_secret_key": "VALUE_SPECIFIED_IN_NO_LOG_PARAMETER",
+    #                         "description": "********",
+    #                         "ec2_url": null,
+    #                         "group_id": null,
+    #                         "name": "********",
+    #                         "profile": null,
+    #                         "purge_rules": true,
+    #                         "purge_rules_egress": true,
+    #                         "purge_tags": true,
+    #                         "region": "**-****-*",
+    #                         "rules": [
+    #                             {
+    #                                 "cidr_ip": [
+    #                                     "***.***.***.***/**"
+    #                                 ],
+    #                                 "group_desc": "ssh",
+    #                                 "ports": [
+    #                                    ****
+    #                                 ],
+    #                                 "proto": "tcp"
+    #                             }
+    #                         ],
+    #                         "rules_egress": null,
+    #                         "security_token": null,
+    #                         "state": "present",
+    #                         "tags": {
+    #                             "Module": "aws_k8s_bootstrap",
+    #                             "Name": "********"
+    #                         },
+    #                         "validate_certs": true,
+    #                         "vpc_id": "vpc-*****************"
+    #                     }
+    #                 },
+    #                 "ip_permissions": [
+    #                     {
+    #                         "from_port": ****,
+    #                         "ip_protocol": "tcp",
+    #                         "ip_ranges": [
+    #                             {
+    #                                 "cidr_ip": "***.***.***.***/**"
+    #                             }
+    #                         ],
+    #                         "ipv6_ranges": [],
+    #                         "prefix_list_ids": [],
+    #                         "to_port": ***
+    #                         "user_id_group_pairs": []
+    #                     }
+    #                 ],
+    #                 "ip_permissions_egress": [
+    #                     {
+    #                         "ip_protocol": "-1",
+    #                         "ip_ranges": [
+    #                             {
+    #                                 "cidr_ip": "0.0.0.0/0"
+    #                             }
+    #                         ],
+    #                         "ipv6_ranges": [],
+    #                         "prefix_list_ids": [],
+    #                         "user_id_group_pairs": []
+    #                     }
+    #                 ],
+    #                 "item": {
+    #                     "description": "********",
+    #                     "name": "********",
+    #                     "rules": [
+    #                         {
+    #                             "cidr_ip": [
+    #                                 "***.***.***.***/**"
+    #                             ],
+    #                             "group_desc": "********",
+    #                             "ports": [
+    #                                 ****
+    #                             ],
+    #                             "proto": "tcp"
+    #                         }
+    #                     ]
+    #                 },
+    #                 "owner_id": "************",
+    #                 "tags": {
+    #                     "Module": "aws_k8s_bootstrap",
+    #                     "Name": "********"
+    #                 },
+    #                 "vpc_id": "vpc-*****************"
+    #             },
+    #             ...
+    #         ]
+    #     }
+    # }
+
+- name: Create IAM Policies for k8s master
+  iam_managed_policy:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    policy_name: "{{ aws_k8s_bootstrap_iam_policy_master }}"
+    policy: "{{ lookup('file', 'kubernetes-master-policy.json') }}"
+    state: present
+  register: aws_k8s_bootstrap_policy_master_result
+
+- name: Debug print aws_k8s_bootstrap_policy_master_result
+  debug:
+    var: aws_k8s_bootstrap_policy_master_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_policy_master_result": {
+    #         "changed": true,
+    #         "failed": false,
+    #         "policy": {
+    #             "arn": "arn:aws:iam::************:policy/kubernetes-master-policy",
+    #             "attachment_count": 0,
+    #             "create_date": "yyyy-mm-ddThh:MM:ss.000000+00:00",
+    #             "default_version_id": "v1",
+    #             "is_attachable": true,
+    #             "path": "/",
+    #             "policy_id": "*********************",
+    #             "policy_name": "kubernetes-master-policy",
+    #             "update_date": "yyyy-mm-ddThh:MM:ss.000000+00:00"
+    #         }
+    #     }
+    # }
+
+- name: Create IAM Policies for k8s minion
+  iam_managed_policy:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    policy_name: "{{ aws_k8s_bootstrap_iam_policy_minion }}"
+    policy: "{{ lookup('file', 'kubernetes-minion-policy.json') }}"
+    state: present
+  register: aws_k8s_bootstrap_policy_minion_result
+
+- name: Debug print aws_k8s_bootstrap_policy_minon_result
+  debug:
+    var: aws_k8s_bootstrap_policy_minion_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_policy_minion_result": {
+    #         "changed": true,
+    #         "failed": false,
+    #         "policy": {
+    #             "arn": "arn:aws:iam::************:policy/kubernetes-minion-policy",
+    #             "attachment_count": 0,
+    #             "create_date": "yyyy-mm-ddThh:MM:ss.000000+00:00",
+    #             "default_version_id": "v1",
+    #             "is_attachable": true,
+    #             "path": "/",
+    #             "policy_id": "*********************",
+    #             "policy_name": "kubernetes-minion-policy",
+    #             "update_date": "yyyy-mm-ddT02:10:53.757000+00:00"
+    #         }
+    #     }
+    # }
+
+- name: Create Role for k8s master
+  iam_role:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ aws_k8s_bootstrap_iam_role_master }}"
+    assume_role_policy_document: "{{ lookup('file', 'kubernetes-master-role.json') }}"
+    managed_policy:
+      - "{{ aws_k8s_bootstrap_policy_master_result.policy.arn }}"
+  register: aws_k8s_bootstrap_role_master_result
+
+- name: Debug print aws_k8s_bootstrap_role_master_result
+  debug:
+    var: aws_k8s_bootstrap_role_master_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_role_master_result": {
+    #         "arn": "arn:aws:iam::************:role/kubernetes-master-role",
+    #         "assume_role_policy_document": {
+    #             "statement": [
+    #                 {
+    #                     "action": "sts:AssumeRole",
+    #                     "effect": "Allow",
+    #                     "principal": {
+    #                         "service": "ec2.amazonaws.com"
+    #                     }
+    #                 }
+    #             ],
+    #             "version": "2012-10-17"
+    #         },
+    #         "attached_policies": [
+    #             {
+    #                 "policy_arn": "arn:aws:iam::************:policy/kubernetes-master-policy",
+    #                 "policy_name": "kubernetes-master-policy"
+    #             }
+    #         ],
+    #         "changed": true,
+    #         "create_date": "yyyy-mm-ddThh:MM:ss+00:00",
+    #         "failed": false,
+    #         "gid": 0,
+    #         "group": "root",
+    #         "iam_role": {
+    #             "arn": "arn:aws:iam::************:role/kubernetes-master-role",
+    #             "assume_role_policy_document": {
+    #                 "statement": [
+    #                     {
+    #                         "action": "sts:AssumeRole",
+    #                         "effect": "Allow",
+    #                         "principal": {
+    #                             "service": "ec2.amazonaws.com"
+    #                         }
+    #                     }
+    #                 ],
+    #                 "version": "2012-10-17"
+    #             },
+    #             "attached_policies": [
+    #                 {
+    #                     "policy_arn": "arn:aws:iam::************:policy/kubernetes-master-policy",
+    #                     "policy_name": "kubernetes-master-policy"
+    #                 }
+    #             ],
+    #             "create_date": "yyyy-mm-ddThh:MM:dd+00:00",
+    #             "max_session_duration": 3600,
+    #             "path": "/",
+    #             "role_id": "*********************",
+    #             "role_name": "kubernetes-master-role"
+    #         },
+    #         "max_session_duration": 3600,
+    #         "mode": "0555",
+    #         "owner": "root",
+    #         "path": "/",
+    #         "role_id": "*********************",
+    #         "role_name": "kubernetes-master-role",
+    #         "size": 257,
+    #         "state": "directory",
+    #         "uid": 0
+    #     }
+    # }
+
+- name: Create Role for k8s minion
+  iam_role:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ aws_k8s_bootstrap_iam_role_minion }}"
+    assume_role_policy_document: "{{ lookup('file', 'kubernetes-minion-role.json') }}"
+    managed_policy:
+      - "{{ aws_k8s_bootstrap_policy_minion_result.policy.arn }}"
+  register: aws_k8s_bootstrap_role_minion_result
+
+- name: Debug print aws_k8s_bootstrap_role_minion_result
+  debug:
+    var: aws_k8s_bootstrap_role_minion_result
+    verbosity: 3
+    # Example
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_role_minion_result": {
+    #         "arn": "arn:aws:iam::************:role/kubernetes-minion-role",
+    #         "assume_role_policy_document": {
+    #             "statement": [
+    #                 {
+    #                     "action": "sts:AssumeRole",
+    #                     "effect": "Allow",
+    #                     "principal": {
+    #                         "service": "ec2.amazonaws.com"
+    #                     }
+    #                 }
+    #             ],
+    #             "version": "2012-10-17"
+    #         },
+    #         "attached_policies": [
+    #             {
+    #                 "policy_arn": "arn:aws:iam::************:policy/kubernetes-minion-policy",
+    #                 "policy_name": "kubernetes-minion-policy"
+    #             }
+    #         ],
+    #         "changed": true,
+    #         "create_date": "yyyy-mm-ddThh:MM:dd+00:00",
+    #         "failed": false,
+    #         "gid": 0,
+    #         "group": "root",
+    #         "iam_role": {
+    #             "arn": "arn:aws:iam::************:role/kubernetes-minion-role",
+    #             "assume_role_policy_document": {
+    #                 "statement": [
+    #                     {
+    #                         "action": "sts:AssumeRole",
+    #                         "effect": "Allow",
+    #                         "principal": {
+    #                             "service": "ec2.amazonaws.com"
+    #                         }
+    #                     }
+    #                 ],
+    #                 "version": "2012-10-17"
+    #             },
+    #             "attached_policies": [
+    #                 {
+    #                     "policy_arn": "arn:aws:iam::************:policy/kubernetes-minion-policy",
+    #                     "policy_name": "kubernetes-minion-policy"
+    #                 }
+    #             ],
+    #             "create_date": "yyyy-mm-ddThh:MM:ss+00:00",
+    #             "max_session_duration": 3600,
+    #             "path": "/",
+    #             "role_id": "*********************",
+    #             "role_name": "kubernetes-minion-role"
+    #         },
+    #         "max_session_duration": 3600,
+    #         "mode": "0555",
+    #         "owner": "root",
+    #         "path": "/",
+    #         "role_id": "*********************",
+    #         "role_name": "kubernetes-minion-role",
+    #         "size": 257,
+    #         "state": "directory",
+    #         "uid": 0
+    #     }
+    # }
+
+- name: Create EC2 Instances
+  ec2:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_subnet_id: "{{ aws_k8s_bootstrap_subnets_result.results | selectattr('item.cidr', 'defined') | selectattr('item.cidr', 'equalto', item.cidr) | map(attribute = 'subnet.id') | first }}"
+    exact_count: "{{ item.count }}"
+    count_tag:
+      Name: "[{{ env }}]:{{ item.name }}"
+      Environment: "{{ env }}"
+      kubespray-role: "{{ item.kubespray_role }}"
+    key_name: "{{ item.key_pair }}"
+    image: "{{ item.ami }}"
+    instance_type: "{{ item.instance_type }}"
+    instance_profile_name: "{{ item.profile }}"
+    profile: "{{ item.profile }}"
+    group: "{{ item.security_group }}"
+    monitoring: no
+    termination_protection: no
+    instance_tags:
+      Name: "[{{ env }}]:{{ item.name }}"
+      Environment: "{{ env }}"
+      kubespray-role: "{{ item.kubespray_role }}"
+    volumes:
+      - device_name: "{{ item.device_name }}"
+        delete_on_termination: yes
+        volume_type: "gp2"
+        volume_size: "{{ item.volume_size }}"
+        tags:
+          Name: "[{{ env }}]:{{ item.name }}"
+          Environment: "{{ env }}"
+          kubespray-role: "{{ item.kubespray_role }}"
+  with_items: "{{ aws_k8s_bootstrap.instances }}"
+  register: aws_k8s_bootstrap_ec2_result
+
+- name: Debug print aws_k8s_bootstrap_ec2_result
+  debug:
+    var: aws_k8s_bootstrap_ec2_result
+    verbosity: 3
+    # Examples
+    # ok: [localhost] => {
+    #     "aws_k8s_bootstrap_ec2_result": {
+    #         "changed": true,
+    #         "msg": "All items completed",
+    #         "results": [
+    #             {
+    #                 "_ansible_ignore_errors": null,
+    #                 "_ansible_item_label": {
+    #                     "ami": "ami-********",
+    #                     "cidr": "10.10.16.0/20",
+    #                     "count": 1,
+    #                     "instance_type": "t2.micro",
+    #                     "key_pair": "********",
+    #                     "kubespray_role": "********",
+    #                     "name": "********",
+    #                     "profile": "",
+    #                     "security_group": "********",
+    #                     "volume_size": 8
+    #                 },
+    #                 "_ansible_item_result": true,
+    #                 "_ansible_no_log": false,
+    #                 "_ansible_parsed": true,
+    #                 "changed": true,
+    #                 "failed": false,
+    #                 "instance_ids": [
+    #                     "i-*****************"
+    #                 ],
+    #                 "instances": [
+    #                     {
+    #                         "ami_launch_index": "0",
+    #                         "architecture": "x86_64",
+    #                         "block_device_mapping": {},
+    #                         "dns_name": "",
+    #                         "ebs_optimized": false,
+    #                         "groups": {
+    #                             "sg-*****************": "********"
+    #                         },
+    #                         "hypervisor": "xen",
+    #                         "id": "i-*****************",
+    #                         "image_id": "ami-********",
+    #                         "instance_type": "t2.micro",
+    #                         "kernel": null,
+    #                         "key_name": "********",
+    #                         "launch_time": "yyyy-mm-ddThh:MM:ss.000Z",
+    #                         "placement": "us-west-1c",
+    #                         "private_dns_name": "ip-********.**-****-*.compute.internal",
+    #                         "private_ip": "10.10.**.**",
+    #                         "public_dns_name": "",
+    #                         "public_ip": null,
+    #                         "ramdisk": null,
+    #                         "region": "us-west-1",
+    #                         "root_device_name": "/dev/xvda",
+    #                         "root_device_type": "ebs",
+    #                         "state": "pending",
+    #                         "state_code": 0,
+    #                         "tags": {
+    #                             "Name": "********",
+    #                             "kubespray-role": "********"
+    #                         },
+    #                         "tenancy": "default",
+    #                         "virtualization_type": "hvm"
+    #                     }
+    #                 ],
+    #                 "invocation": {
+    #                     "module_args": {
+    #                         "assign_public_ip": null,
+    #                         "aws_access_key": "********************",
+    #                         "aws_secret_key": "VALUE_SPECIFIED_IN_NO_LOG_PARAMETER",
+    #                         "count": 1,
+    #                         "count_tag": "{'Name': '********', 'kubespray-role': '********'}",
+    #                         "ebs_optimized": false,
+    #                         "ec2_url": null,
+    #                         "exact_count": 1,
+    #                         "group": [
+    #                             "********"
+    #                         ],
+    #                         "group_id": null,
+    #                         "id": null,
+    #                         "image": "ami-********",
+    #                         "instance_ids": null,
+    #                         "instance_initiated_shutdown_behavior": null,
+    #                         "instance_profile_name": "",
+    #                         "instance_tags": {
+    #                             "Name": "********",
+    #                             "kubespray-role": "********"
+    #                         },
+    #                         "instance_type": "t2.micro",
+    #                         "kernel": null,
+    #                         "key_name": "********",
+    #                         "monitoring": false,
+    #                         "network_interfaces": null,
+    #                         "placement_group": null,
+    #                         "private_ip": null,
+    #                         "profile": null,
+    #                         "ramdisk": null,
+    #                         "region": "**-****-*",
+    #                         "security_token": null,
+    #                         "source_dest_check": true,
+    #                         "spot_launch_group": null,
+    #                         "spot_price": null,
+    #                         "spot_type": "one-time",
+    #                         "spot_wait_timeout": "600",
+    #                         "state": "present",
+    #                         "tenancy": "default",
+    #                         "termination_protection": false,
+    #                         "user_data": null,
+    #                         "validate_certs": true,
+    #                         "volumes": [
+    #                             {
+    #                                 "delete_on_termination": true,
+    #                                 "device_name": "/dev/xvda",
+    #                                 "tags": {
+    #                                     "Name": "********"
+    #                                 },
+    #                                 "volume_size": "8",
+    #                                 "volume_type": "gp2"
+    #                             }
+    #                         ],
+    #                         "vpc_subnet_id": "subnet-*****************",
+    #                         "wait": false,
+    #                         "wait_timeout": "300",
+    #                         "zone": null
+    #                     }
+    #                 },
+    #                 "item": {
+    #                     "ami": "ami-********",
+    #                     "cidr": "10.10.16.0/20",
+    #                     "count": 1,
+    #                     "instance_type": "t2.micro",
+    #                     "key_pair": "********",
+    #                     "kubespray_role": "********",
+    #                     "name": "********",
+    #                     "profile": "",
+    #                     "security_group": "********",
+    #                     "volume_size": 8
+    #                 },
+    #                 "tagged_instances": [
+    #                     {
+    #                         "ami_launch_index": "0",
+    #                         "architecture": "x86_64",
+    #                         "block_device_mapping": {},
+    #                         "dns_name": "",
+    #                         "ebs_optimized": false,
+    #                         "groups": {
+    #                             "sg-*****************": "********"
+    #                         },
+    #                         "hypervisor": "xen",
+    #                         "id": "i-*****************",
+    #                         "image_id": "ami-********",
+    #                         "instance_type": "t2.micro",
+    #                         "kernel": null,
+    #                         "key_name": "********",
+    #                         "launch_time": "yyyy-mm-ddThh:MM:ss.000Z",
+    #                         "placement": "us-west-1c",
+    #                         "private_dns_name": "ip-********.**-****-*.compute.internal",
+    #                         "private_ip": "10.10.***.***",
+    #                         "public_dns_name": "",
+    #                         "public_ip": null,
+    #                         "ramdisk": null,
+    #                         "region": "us-west-1",
+    #                         "root_device_name": "/dev/xvda",
+    #                         "root_device_type": "ebs",
+    #                         "state": "pending",
+    #                         "state_code": 0,
+    #                         "tags": {
+    #                             "Name": "********",
+    #                             "kubespray-role": "********"
+    #                         },
+    #                         "tenancy": "default",
+    #                         "virtualization_type": "hvm"
+    #                     }
+    #                 ]
+    #             },
+    #             ...
+    #         ]
+    #     }
+    # }
+
+
+

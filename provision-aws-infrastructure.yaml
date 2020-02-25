@@ -1,0 +1,31 @@
+---
+- hosts: local
+  connection: local
+  vars:
+    env: "{{ lookup('env', 'ENV') }}"
+    region: "{{ lookup('env', 'REGION') }}"
+    provider: "{{ lookup('env', 'PROVIDER') }}"
+  tasks:
+    - include_vars:
+        file: "vars/{{ provider }}/{{ region }}-{{ env }}.yaml"
+
+- hosts: local
+  connection: local
+  gather_facts: no
+  vars:
+    env: "{{ lookup('env', 'ENV') }}"
+    region: "{{ lookup('env', 'REGION') }}"
+    provider: "{{ lookup('env', 'PROVIDER') }}"
+  roles:
+    - aws-credentials
+    - aws-vpc
+    - aws-iam
+    - aws-igw
+    - aws-subnet
+    - aws-nat
+    - aws-route-table
+    - aws-security-group
+    - aws-ec2-instance
+    - aws-eip
+    - aws-nlb
+    - aws-ansible-hosts

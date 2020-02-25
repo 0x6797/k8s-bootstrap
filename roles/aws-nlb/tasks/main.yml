@@ -1,0 +1,35 @@
+---
+# tasks file for aws-nlb
+- name: aws-nlb | Dynamic create elb_target_group task
+  template:
+    src: templates/target-group.yml.j2
+    dest: "{{ role_path }}/tasks/target-group.yml"
+
+- name: aws-nlb | Include task
+  include_tasks: tasks/target-group.yml
+
+- name: aws-nlb | Ensure to exist Network Load Balancer
+  elb_network_lb:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ env }}-kubernetes-nlb-api"
+    state: present
+    subnets: "{{ aws_public_subnet_list | map(attribute='id') | list }}"
+    cross_zone_load_balancing: yes
+    listeners:
+      - Protocol: TCP
+        Port: "{{ aws_elb_api_lb_port }}"
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ env }}-kubernetes-secure-port"
+      - Protocol: TCP
+        Port: "{{ aws_elb_api_insecure_lb_port }}"
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ env }}-kubernetes-insecure-port"
+  register: aws_nlb_api_result
+
+- name: aws-elb | Register API Domain name
+  set_fact:
+    aws_elb_api_domain_name: "{{ aws_nlb_api_result.dns_name }}"

@@ -1,0 +1,40 @@
+[all]
+{% for m in aws_ec2_master_instance_list %}
+{{ m.tags.Name }} ansible_host={{ m.private_ip }} ansible_user=core
+{% endfor %}
+{% for e in aws_ec2_etcd_instance_list %}
+{{ e.tags.Name }} ansible_host={{ e.private_ip }} ansible_user=core
+{% endfor %}
+{% for n in aws_ec2_minion_instance_list %}
+{{ n.tags.Name }} ansible_host={{ n.private_ip }} ansible_user=core
+{% endfor %}
+{% for b in aws_ec2_bastion_instance_list %}
+{{ b.tags.Name }} ansible_host={{ b.private_ip }} ansible_user=ec2-user
+{% endfor %}
+
+[bastion]
+{% for b in aws_ec2_bastion_instance_list %}
+{{ b.tags.Name }} ansible_host={{ b.public_ip }} ansible_user=ec2-user
+{% endfor %}
+
+[kube-master]
+{% for m in aws_ec2_master_instance_list %}
+{{ m.tags.Name }}
+{% endfor %}
+
+[kube-node]
+{% for n in aws_ec2_minion_instance_list %}
+{{ n.tags.Name }}
+{% endfor %}
+
+[etcd]
+{% for e in aws_ec2_etcd_instance_list %}
+{{ e.tags.Name }}
+{% endfor %}
+
+[k8s-cluster:children]
+kube-master
+kube-node
+
+[k8s-cluster:vars]
+apiserver_loadbalancer_domain_name="{{ aws_elb_api_domain_name }}"

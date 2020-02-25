@@ -1,0 +1,40 @@
+---
+# tasks file for aws-subnet
+- name: aws-subnet | Create Public Subnets
+  ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_vpc_id }}"
+    az: "{{ item.1.az }}"
+    cidr: "{{ item.1.cidr }}"
+    map_public: yes
+    tags:
+      Name: "{{ env }}-kubernetes-public-subnet-{{ item.0 }}"
+      Environment: "{{ env }}"
+  with_indexed_items: "{{ aws_public_subnet }}"
+  register: aws_public_subnet_result
+
+- name: aws-subnet | Create Private Subnets
+  ec2_vpc_subnet:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_vpc_id }}"
+    az: "{{ item.1.az }}"
+    cidr: "{{ item.1.cidr }}"
+    map_public: no
+    tags:
+      Name: "{{ env }}-kubernetes-private-subnet-{{ item.0 }}"
+      Environment: "{{ env }}"
+  with_indexed_items: "{{ aws_private_subnet }}"
+  register: aws_private_subnet_result
+
+- name: aws-subnet | Register Public Subnet Ids
+  set_fact:
+    aws_public_subnet_list: "{{ aws_public_subnet_result.results | map(attribute='subnet') | list }}"
+
+- name: aws-subnet | Register Private Subnet Ids
+  set_fact:
+    aws_private_subnet_list: "{{ aws_private_subnet_result.results | map(attribute='subnet') | list }}"
+

@@ -1,0 +1,15 @@
+---
+# tasks file for aws-nat
+- name: aws-nat | Create NAT Gateway
+  ec2_vpc_nat_gateway:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    if_exist_do_not_create: yes
+    subnet_id: "{{ item.id }}"
+  with_items: "{{ aws_public_subnet_list }}"
+  register: aws_nat_result
+
+- name: aws-nat | Register NAT Gateway Id
+  set_fact:
+    aws_nat_gateway_list: "{{ aws_nat_result.results }}"

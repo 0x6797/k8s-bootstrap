@@ -1,0 +1,219 @@
+---
+# tasks file for aws-instances
+- name: aws-ec2-instance | Set kubernetes.io info
+  set_fact:
+    aws_ec2_tag_kubernetes_io: "{'kubernetes.io/cluster/{{ env }}': 'member'}"
+
+- name: aws-ec2-instance | Create EC2 Instance - bastion
+  ec2:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_subnet_id: "{{ aws_public_subnet_list | selectattr('cidr_block', 'equalto', item.1.cidr) | map(attribute = 'id') | first }}"
+    exact_count: 1
+    count_tag:
+      Name: "{{ env }}-kubernetes-bastion-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "bastion"
+      kubespray-role: "bastion"
+      User: "ec2-user"
+    key_name: "{{ aws_key_pair_name }}"
+    image: "{{ aws_ec2_bastion_ami_id }}"
+    instance_type: "{{ aws_ec2_bastion_instance_type }}"
+    instance_profile_name: ""
+    profile: ""
+    group: "{{ env }}-kubernetes-sg-bastion"
+    monitoring: no
+    termination_protection: no
+    user_data: ""
+    instance_tags:
+      Name: "{{ env }}-kubernetes-bastion-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "bastion"
+      kubespray-role: "bastion"
+      User: "ec2-user"
+    volumes:
+      - device_name: "/dev/xvda"
+        delete_on_termination: yes
+        volume_type: "gp2"
+        volume_size: "{{ aws_ec2_bastion_volume_size }}"
+        tags:
+          Name: "{{ env }}-kubernetes-bastion-{{ item.0 }}"
+          Environment: "{{ env }}"
+          Role: "bastion"
+          kubespray-role: "bastion"
+          User: "ec2-user"
+  with_indexed_items: "{{ aws_ec2_bastion_list }}"
+  register: aws_ec2_bastion_result
+
+- name: aws-ec2-instance | Register bastion instances list
+  set_fact:
+    aws_ec2_bastion_instance_list: "{{ aws_ec2_bastion_result.results | map(attribute='tagged_instances.0') | list }}"
+
+- name: aws-ec2-instance | Create EC2 Instance - kubernetes master
+  ec2:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_subnet_id: "{{ aws_private_subnet_list | selectattr('cidr_block', 'equalto', item.1.cidr) | map(attribute = 'id') | first }}"
+    exact_count: 1
+    count_tag:
+      Name: "{{ env }}-kubernetes-master-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "master"
+      kubespray-role: "kube-master"
+      User: "core"
+    key_name: "{{ aws_key_pair_name }}"
+    image: "{{ aws_ec2_master_ami_id }}"
+    instance_type: "{{ aws_ec2_master_instance_type }}"
+    instance_profile_name: "{{ env }}-kubernetes-role-master"
+    profile: "{{ env }}-kubernetes-role-master"
+    group: "{{ env }}-kubernetes-sg-master"
+    monitoring: no
+    termination_protection: no
+    user_data: ""
+    instance_tags:
+      Name: "{{ env }}-kubernetes-master-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "master"
+      kubespray-role: "kube-master"
+      User: "core"
+    volumes:
+      - device_name: "/dev/xvda"
+        delete_on_termination: yes
+        volume_type: "gp2"
+        volume_size: "{{ aws_ec2_master_volume_size }}"
+        tags:
+          Name: "{{ env }}-kubernetes-master-{{ item.0 }}"
+          Environment: "{{ env }}"
+          Role: "master"
+          kubespray-role: "kube-master"
+          User: "core"
+  with_indexed_items: "{{ aws_ec2_master_list }}"
+  register: aws_ec2_master_result
+
+- name: aws-ec2-instance | Register kubernetes master instances list
+  set_fact:
+    aws_ec2_master_instance_list: "{{ aws_ec2_master_result.results | map(attribute='tagged_instances.0') | list }}"
+
+- name: aws-ec2-instance | Add extra tag to master
+  ec2_tag:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    resource: "{{ item.id }}"
+    state: present
+    tags: "{{ aws_ec2_tag_kubernetes_io }}"
+  with_items: "{{ aws_ec2_master_instance_list }}"
+
+- name: aws-ec2-instance | Create EC2 Instance - kubernetes etcd
+  ec2:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_subnet_id: "{{ aws_private_subnet_list | selectattr('cidr_block', 'equalto', item.1.cidr) | map(attribute = 'id') | first }}"
+    exact_count: 1
+    count_tag:
+      Name: "{{ env }}-kubernetes-etcd-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "etcd"
+      kubespray-role: "etcd"
+      User: "core"
+    key_name: "{{ aws_key_pair_name }}"
+    image: "{{ aws_ec2_etcd_ami_id }}"
+    instance_type: "{{ aws_ec2_etcd_instance_type }}"
+    instance_profile_name: "{{ env }}-kubernetes-role-master"
+    profile: "{{ env }}-kubernetes-role-master"
+    group: "{{ env }}-kubernetes-sg-master"
+    monitoring: no
+    termination_protection: no
+    user_data: ""
+    instance_tags:
+      Name: "{{ env }}-kubernetes-etcd-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "etcd"
+      kubespray-role: "etcd"
+      User: "core"
+    volumes:
+      - device_name: "/dev/xvda"
+        delete_on_termination: yes
+        volume_type: "gp2"
+        volume_size: "{{ aws_ec2_etcd_volume_size }}"
+        tags:
+          Name: "{{ env }}-kubernetes-etcd-{{ item.0 }}"
+          Environment: "{{ env }}"
+          Role: "etcd"
+          kubespray-role: "etcd"
+          User: "core"
+  with_indexed_items: "{{ aws_ec2_etcd_list }}"
+  register: aws_ec2_etcd_result
+
+- name: aws-ec2-instance | Register kubernetes etcd instances list
+  set_fact:
+    aws_ec2_etcd_instance_list: "{{ aws_ec2_etcd_result.results | map(attribute='tagged_instances.0') | list }}"
+
+- name: aws-ec2-instance | Add extra tag to etcd
+  ec2_tag:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    resource: "{{ item.id }}"
+    state: present
+    tags: "{{ aws_ec2_tag_kubernetes_io }}"
+  with_items: "{{ aws_ec2_etcd_instance_list }}"
+
+- name: aws-ec2-instance | Create EC2 Instance - kubernetes minion
+  ec2:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_subnet_id: "{{ aws_private_subnet_list | selectattr('cidr_block', 'equalto', item.1.cidr) | map(attribute = 'id') | first }}"
+    exact_count: 1
+    count_tag:
+      Name: "{{ env }}-kubernetes-minion-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "worker"
+      kubespray-role: "kube-node"
+      User: "core"
+    key_name: "{{ aws_key_pair_name }}"
+    image: "{{ aws_ec2_minion_ami_id }}"
+    instance_type: "{{ aws_ec2_minion_instance_type }}"
+    instance_profile_name: "{{ env }}-kubernetes-role-minion"
+    profile: "{{ env }}-kubernetes-role-minion"
+    group: "{{ env }}-kubernetes-sg-minion"
+    monitoring: no
+    termination_protection: no
+    user_data: ""
+    instance_tags:
+      Name: "{{ env }}-kubernetes-minion-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "worker"
+      kubespray-role: "kube-node"
+      User: "core"
+    volumes:
+      - device_name: "/dev/xvda"
+        delete_on_termination: yes
+        volume_type: "gp2"
+        volume_size: "{{ aws_ec2_minion_volume_size }}"
+        tags:
+          Name: "{{ env }}-kubernetes-minion-{{ item.0 }}"
+          Environment: "{{ env }}"
+          Role: "worker"
+          kubespray-role: "kube-node"
+          User: "core"
+  with_indexed_items: "{{ aws_ec2_minion_list }}"
+  register: aws_ec2_minion_result
+
+- name: aws-ec2-instance | Register kubernetes minion instances list
+  set_fact:
+    aws_ec2_minion_instance_list: "{{ aws_ec2_minion_result.results | map(attribute='tagged_instances.0') | list }}"
+
+- name: aws-ec2-instance | Add extra tag to minion
+  ec2_tag:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    resource: "{{ item.id }}"
+    state: present
+    tags: "{{ aws_ec2_tag_kubernetes_io }}"
+  with_items: "{{ aws_ec2_minion_instance_list }}"

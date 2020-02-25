@@ -1,0 +1,16 @@
+---
+# tasks file for aws-igw
+- name: aws-igw | Create Internet Gateway
+  ec2_vpc_igw:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_vpc_id }}"
+    tags:
+      Name: "{{ env }}-kubernetes-internet-gateway"
+      Environment: "{{ env }}"
+  register: aws_igw_result
+
+- name: aws-igw | Register Internet Gateway Id
+  set_fact:
+    aws_igw_id: "{{ aws_igw_result.gateway_id }}"

@@ -1,0 +1,44 @@
+---
+# tasks file for nvim
+- name: nvim | Install Development tools (YUM)
+  yum:
+    name: "@Development tools"
+    state: latest
+  become: yes
+  when: ansible_pkg_mgr == "yum"
+
+- name: nvim | Install cmake and python3 (YUM)
+  yum:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - git
+    - cmake
+    - python3-devel
+    - python3-pip
+  become: yes
+  when: ansible_pkg_mgr == "yum"
+
+- name: nvim | Check if installed nvim
+  stat:
+    path: ~/.nviminstalled
+  register: nvim_installed
+
+- name: nvim | Install nvim
+  shell: |
+    set -eu
+    cd "$(mktemp -d)"
+    git clone https://github.com/neovim/neovim.git
+    cd neovim
+    make CMAKE_BUILD_TYPE=Release
+    sudo make install
+  register: nvim_cmake
+  when: not nvim_installed.stat.exists
+
+- name: nvim | Mark nvim installed
+  file:
+    path: ~/.nviminstalled
+    state: touch
+  when:
+    - nvim_cmake is not skipped
+    - nvim_cmake.rc == 0

@@ -1,0 +1,4 @@
+bastion_kubectl_playbook_dir: ~/bitx-k8s-kubectl
+bastion_kubectl_git_repo: ssh://git@github.com:OGIS-RI-EOS/bitx-k8s-kubectl.git
+bastion_kubectl_git_ssh_key_name: bitx-k8s-kubectl.pem
+bastion_kubectl_git_ssh_key_path: "~/.ssh/{{ bastion_kubectl_git_ssh_key_name }}"

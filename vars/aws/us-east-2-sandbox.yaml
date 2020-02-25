@@ -1,0 +1,130 @@
+---
+# AWS Credentials used by set-aws-credentials.
+aws_access_key_id:
+aws_secret_access_key:
+aws_default_region: "{{ lookup('env', 'REGION') }}"
+aws_key_pair_name: "{{ lookup('env', 'SECRET_KEY_NAME') }}"
+
+aws_vpc:
+  cidr_block: 10.250.0.0/16
+
+  # Available Subnets
+  # - Public Subnets
+  #   - 10.250.0.0/20
+  #   - 10.250.16.0/20
+  #   - 10.250.32.0/20
+  #   - 10.250.48.0/20
+  #   - 10.250.64.0/20
+  #   - 10.250.80.0/20
+  #   - 10.250.96.0/20
+  #   - 10.250.112.0/20
+  # - Private Subnets
+  #   - 10.250.128.0/20
+  #   - 10.250.144.0/20
+  #   - 10.250.160.0/20
+  #   - 10.250.176.0/20
+  #   - 10.250.192.0/20
+  #   - 10.250.208.0/20
+  #   - 10.250.224.0/20
+  #   - 10.250.240.0/20
+
+aws_public_subnet:
+  - { az: us-east-2a, cidr: 10.250.0.0/20 }
+  - { az: us-east-2b, cidr: 10.250.16.0/20 }
+  - { az: us-east-2c, cidr: 10.250.32.0/20 }
+
+aws_private_subnet:
+  - { az: us-east-2a, cidr: 10.250.128.0/20 }
+  - { az: us-east-2b, cidr: 10.250.144.0/20 }
+  - { az: us-east-2c, cidr: 10.250.160.0/20 }
+
+aws_my_public_ipv4:
+
+aws_security_group:
+  - name: "kubernetes-sg-bastion"
+    description: "SG for kubernetes bastion"
+    rules:
+      - proto: tcp
+        ports: [443]
+        cidr_ip: [158.201.127.1/32]
+        group_desc: ssh-from-ogis
+      - proto: tcp
+        ports: [22]
+        cidr_ip:
+          - "{{ aws_my_public_ipv4 }}/32"
+          - "{{ aws_vpc.cidr_block }}"
+        group_desc: ssh
+      - proto: icmp
+        from_port: -1
+        to_port: -1
+        cidr_ip:
+          - "{{ aws_my_public_ipv4 }}/32"
+          - "{{ aws_vpc.cidr_block }}"
+          - 158.201.127.1/32
+        group_desc: ping
+  - name: "kubernetes-sg-master"
+    description: "SG for kubernetes master"
+    rules:
+      - proto: all
+        from_port: -1
+        to_port: -1
+        cidr_ip: ["{{ aws_vpc.cidr_block }}"]
+      - proto: tcp
+        ports:
+          - "{{ aws_elb_api_instance_port }}"
+        cidr_ip: [158.201.127.1/32]
+      - proto: tcp
+        ports:
+          - "{{ aws_elb_api_insecure_instance_port }}"
+        cidr_ip: [158.201.127.1/32]
+  - name: "kubernetes-sg-minion"
+    description: "SG for kubernetes minion"
+    rules:
+      - proto: all
+        from_port: -1
+        to_port: -1
+        cidr_ip: ["{{ aws_vpc.cidr_block }}"]
+
+aws_elb_api_lb_port: 443
+aws_elb_api_instance_port: 6443
+aws_elb_api_insecure_lb_port: 80
+aws_elb_api_insecure_instance_port: 8080
+
+aws_amazon_linux2_ami_id: ami-8c122be9
+aws_coreos_ami_id: 	ami-b1013bd4
+aws_ubuntu_ami_id:
+
+aws_ec2_bastion_instance_type: t2.medium
+aws_ec2_bastion_ami_id: "{{ aws_amazon_linux2_ami_id }}"
+aws_ec2_bastion_volume_size: 8
+aws_ec2_bastion_list:
+  - cidr: 10.250.0.0/20
+  - cidr: 10.250.16.0/20
+  - cidr: 10.250.32.0/20
+
+aws_ec2_master_instance_type: t2.medium
+aws_ec2_master_ami_id: "{{ aws_coreos_ami_id }}"
+aws_ec2_master_volume_size: 16
+aws_ec2_master_list:
+  - cidr: 10.250.128.0/20
+  - cidr: 10.250.144.0/20
+  - cidr: 10.250.160.0/20
+
+aws_ec2_etcd_instance_type: t2.medium
+aws_ec2_etcd_ami_id: "{{ aws_coreos_ami_id }}"
+aws_ec2_etcd_volume_size: 32
+aws_ec2_etcd_list:
+  - cidr: 10.250.128.0/20
+  - cidr: 10.250.144.0/20
+  - cidr: 10.250.160.0/20
+
+aws_ec2_minion_instance_type: t2.xlarge
+aws_ec2_minion_ami_id: "{{ aws_coreos_ami_id }}"
+aws_ec2_minion_volume_size: 64
+aws_ec2_minion_list:
+  - cidr: 10.250.128.0/20
+  - cidr: 10.250.144.0/20
+  - cidr: 10.250.160.0/20
+  - cidr: 10.250.128.0/20
+  - cidr: 10.250.144.0/20
+  - cidr: 10.250.160.0/20

@@ -1,0 +1,28 @@
+---
+# tasks file for aws-security-group
+- name: aws-security-group | Retrieve Public IPv4 Address
+  shell: "curl -q http://169.254.169.254/latest/meta-data/public-ipv4"
+  args:
+    warn: no
+  register: aws_my_public_ipv4_result
+
+- name: aws-security-group | Register my Public IPv4 Address
+  set_fact:
+    aws_my_public_ipv4: "{{ aws_my_public_ipv4_result.stdout }}"
+  when:
+    - aws_my_public_ipv4_result.rc == 0
+
+- name: aws-security-group | Create Security Groups
+  ec2_group:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_vpc_id }}"
+    name: "{{ env }}-{{ item.name }}"
+    description: "{{ item.description }}"
+    rules: "{{ item.rules }}"
+    tags:
+      Name: "{{ env }}-{{ item.name }}"
+      Environment: "{{ env }}"
+  with_items: "{{ aws_security_group }}"
+

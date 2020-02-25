@@ -1,0 +1,5 @@
+---
+# defaults file for bastion-kubespray
+bastion_kubespray_dir: ~/kubespray
+bastion_kubespray_repo: http://github.com/kubernetes-incubator/kubespray.git
+bastion_kubespray_bootstrap_os: coreos

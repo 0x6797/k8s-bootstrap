@@ -1,0 +1,34 @@
+---
+- name: aws-elb | Ensure existing Target Group for secure port
+  elb_target_group:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ env }}-kubernetes-secure-port"
+    vpc_id: "{{ aws_vpc_id }}"
+    protocol: tcp
+    port: "{{ aws_elb_api_instance_port }}"
+    state: present
+    target_type: instance
+    targets:
+{% for i in aws_ec2_master_instance_list %}
+      - Id: {{ i.id }}
+        Port: {{ aws_elb_api_instance_port}}
+{% endfor %}
+
+- name: aws-elb | Ensure existing Target Group for insecure port
+  elb_target_group:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ env }}-kubernetes-insecure-port"
+    vpc_id: "{{ aws_vpc_id }}"
+    protocol: tcp
+    port: "{{ aws_elb_api_insecure_instance_port }}"
+    state: present
+    target_type: instance
+    targets:
+{% for i in aws_ec2_master_instance_list %}
+      - Id: {{ i.id }}
+        Port: {{ aws_elb_api_insecure_instance_port}}
+{% endfor %}

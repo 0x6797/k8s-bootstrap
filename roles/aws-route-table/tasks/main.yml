@@ -1,0 +1,33 @@
+---
+# tasks file for aws-route-table
+- name: aws-route-table | Create Public Route Table
+  ec2_vpc_route_table:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_vpc_id }}"
+    subnets: "{{ aws_public_subnet_list | map(attribute='id') | list  }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ aws_igw_id }}"
+    tags:
+      Name: "{{ env }}-kubernetes-routetable-public"
+      Environment: "{{ env }}"
+      Visibility: "public"
+
+- name: aws-route-table | Create Private Route Table
+  ec2_vpc_route_table:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_id: "{{ aws_vpc_id }}"
+    subnets: "{{ aws_private_subnet_list | selectattr('availability_zone', 'equalto', item.1.item.availability_zone) | map(attribute='id') | list }}"
+    routes:
+      - dest: 0.0.0.0/0
+        nat_gateway_id: "{{ item.1.nat_gateway_id }}"
+    tags:
+      Name: "{{ env }}-kubernetes-routetable-private-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Visibility: "internal"
+  with_indexed_items: "{{ aws_nat_gateway_list }}"
+

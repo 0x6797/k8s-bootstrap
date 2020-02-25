@@ -1,0 +1,16 @@
+---
+# vars file for aws-k8s-bootstrap
+aws_k8s_bootstrap_vpc_result:
+aws_k8s_bootstrap_igw_result:
+aws_k8s_bootstrap_subnets_result:
+aws_k8s_bootstrap_public_route_result:
+aws_k8s_bootstrap_private_route_result:
+aws_k8s_bootstrap_sg_result:
+aws_k8s_bootstrap_policy_master_result:
+aws_k8s_bootstrap_policy_minion_result:
+aws_k8s_bootstrap_role_master_result:
+aws_k8s_bootstrap_role_minion_result:
+aws_k8s_bootstrap_ec2_result:
+
+aws_k8s_bootstrap_iam_policy_master: kubernetes-master-policy
+aws_k8s_bootstrap_iam_role_master: kubernetes-master-role

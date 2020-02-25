@@ -1,0 +1,36 @@
+---
+# tasks file for aws-elb
+- name: aws-elb | Ensure to exist Classic ELB
+  ec2_elb_lb:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    name: "{{ env }}-kubernetes-elb-api"
+    state: present
+    subnets: "{{ aws_public_subnet_list | map(attribute='id') | list }}"
+    security_group_names: ["{{ env }}-kubernetes-sg-elb"]
+    cross_az_load_balancing: yes
+    connection_draining_timeout: 400
+    idle_timeout: 400
+    tags:
+      Name: "{{ env }}-kubernetes-elb-api"
+      Environment: "{{ env }}"
+    listeners:
+      - protocol: tcp
+        load_balancer_port: "{{ aws_elb_api_lb_port }}"
+        instance_port: "{{ aws_elb_api_instance_port }}"
+      - protocol: tcp
+        load_balancer_port: "{{ aws_elb_api_insecure_lb_port }}"
+        instance_port: "{{ aws_elb_api_insecure_instance_port }}"
+    health_check:
+      ping_protocol: tcp
+      ping_port: "{{ aws_elb_api_instance_port }}"
+      response_timeout: 3
+      interval: 30
+      unhealthy_threshold: 2
+      healthy_threshold: 2
+  register: aws_elb_api_result
+
+- name: aws-elb | Register Host Zone Name
+  set_fact:
+    aws_elb_api_domain_name: "{{ aws_elb_api_result.elb.hosted_zone_name }}"

@@ -1,0 +1,17 @@
+---
+# tasks file for bastion-kubectl
+- name: bastion-kubectl | Remove kubectl playbook if presents
+  file:
+    path: "{{ bastion_kubectl_playbook_dir }}"
+    state: absent
+
+- name: bastion-kubectl | Copy kubectl playbook from localhost
+  copy:
+    src: "{{ bastion_kubectl_playbook_dir }}"
+    dest: ~/
+
+- name: bastion-kubectl | Copy dynamyc inventory script
+  copy:
+    src: "{{ playbook_dir }}/inventory/{{ provider }}/{{ region }}-{{ env }}.py"
+    dest: "{{ bastion_kubectl_playbook_dir }}/inventory/hosts.py"
+    mode: 0755

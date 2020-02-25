@@ -1,0 +1,67 @@
+---
+# tasks file for aws-eip
+- name: aws-eip | Allocate Elastic IP to bastion instances
+  ec2_eip:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    device_id: "{{ item.id }}"
+    reuse_existing_ip_allowed: yes
+    in_vpc: yes
+  register: aws_eip_result
+  with_items: "{{ aws_ec2_bastion_instance_list }}"
+
+- name: aws-eip | Get latast bastion instance information
+  ec2:
+    aws_access_key: "{{ aws_access_key_id }}"
+    aws_secret_key: "{{ aws_secret_access_key }}"
+    region: "{{ aws_default_region }}"
+    vpc_subnet_id: "{{ aws_public_subnet_list | selectattr('cidr_block', 'equalto', item.1.cidr) | map(attribute = 'id') | first }}"
+    exact_count: 1
+    count_tag:
+      Name: "{{ env }}-kubernetes-bastion-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "bastion"
+      kubespray-role: "bastion"
+      User: "ec2-user"
+    key_name: "{{ aws_key_pair_name }}"
+    image: "{{ aws_ec2_bastion_ami_id }}"
+    instance_type: "{{ aws_ec2_bastion_instance_type }}"
+    instance_profile_name: ""
+    profile: ""
+    group: "{{ env }}-kubernetes-sg-bastion"
+    monitoring: no
+    termination_protection: no
+    user_data: ""
+    instance_tags:
+      Name: "{{ env }}-kubernetes-bastion-{{ item.0 }}"
+      Environment: "{{ env }}"
+      Role: "bastion"
+      kubespray-role: "bastion"
+      User: "ec2-user"
+    volumes:
+      - device_name: "/dev/xvda"
+        delete_on_termination: yes
+        volume_type: "gp2"
+        volume_size: "{{ aws_ec2_bastion_volume_size }}"
+        tags:
+          Name: "{{ env }}-kubernetes-bastion-{{ item.0 }}"
+          Environment: "{{ env }}"
+          Role: "bastion"
+          kubespray-role: "bastion"
+          User: "ec2-user"
+  with_indexed_items: "{{ aws_ec2_bastion_list }}"
+  register: aws_ec2_bastion_result
+
+- name: aws-eip | Register bastion instances list
+  set_fact:
+    aws_ec2_bastion_instance_list: "{{ aws_ec2_bastion_result.results | map(attribute='tagged_instances.0') | list }}"
+
+- name: aws-eip | Wait for SSH port up
+  wait_for:
+    host: "{{ item.public_ip }}"
+    port: "{{ ansible_port | default(22) }}"
+    state: started
+    delay: 1
+  with_items: "{{ aws_eip_result.results }}"
+  connection: local

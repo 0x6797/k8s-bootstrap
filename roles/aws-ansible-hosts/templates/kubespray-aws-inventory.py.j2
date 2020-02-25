@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+import boto3
+import os
+import argparse
+import json
+
+class SearchEC2Tags(object):
+
+  def __init__(self):
+    self.parse_args()
+    if self.args.list:
+      self.search_tags()
+    if self.args.host:
+      data = {}
+      print json.dumps(data, indent=2)
+
+  def parse_args(self):
+
+    ##Support --list and --host flags. We largely ignore the host one.
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--list', action='store_true', default=False, help='List instances')
+    parser.add_argument('--host', action='store_true', help='Get all the variables about a specific instance')
+    self.args = parser.parse_args()
+
+  def search_tags(self):
+    hosts = {}
+    hosts['_meta'] = { 'hostvars': {} }
+
+    ##Search ec2 three times to find nodes of each group type. Relies on kubespray-role key/value.
+    for group in ["kube-master", "kube-node", "etcd", "bastion"]:
+      hosts[group] = []
+      tag_key = "kubespray-role"
+      tag_value = ["*"+group+"*"]
+      region = "{{ aws_default_region }}"
+      env = "{{ env }}"
+
+      ec2 = boto3.resource('ec2', region)
+
+      instances = ec2.instances.filter(
+                      Filters=[
+                          {'Name': 'tag:'+tag_key, 'Values': tag_value},
+                          {'Name': 'instance-state-name', 'Values': ['running']},
+                          {'Name': 'tag:Environment', 'Values': [env]}
+                      ]
+	          )
+
+      for instance in instances:
+	host_name = filter(lambda t: t['Key'] == 'Name', instance.tags)[0]['Value']
+        hosts[group].append(host_name)
+        hosts['_meta']['hostvars'][host_name] = {
+           'ansible_host': instance.private_ip_address,
+           'ansible_user': filter(lambda t: t['Key'] == 'User', instance.tags)[0]['Value'],
+	   'ansible_ssh_private_key_file': '~/.ssh/{{ aws_key_pair_name }}.pem'
+        }
+
+    hosts['k8s-cluster'] = {
+	'children': ['kube-master', 'kube-node'],
+	'vars':     {'apiserver_loadbalancer_domain_name':'{{ aws_elb_api_domain_name }}'}
+	}
+    print json.dumps(hosts, sort_keys=True, indent=2)
+
+SearchEC2Tags()
+

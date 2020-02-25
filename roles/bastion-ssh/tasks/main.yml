@@ -1,0 +1,48 @@
+---
+# tasks file for bastion-ssh
+- name: Ensure to exist .ssh direcotry
+  file:
+    path: ~/.ssh
+    mode: 0755
+  become: no
+
+- name: bastion-ssh | Copy a secret key to bastion
+  copy:
+    src: "~/.ssh/{{ secret_key_name }}.pem"
+    dest: "~/.ssh/{{ secret_key_name }}.pem"
+    mode: 0400
+  become: no
+
+- name: bastion-ssh | Security upgrade all package to latest version (YUM)
+  yum:
+    name: '*'
+    state: latest
+    security: yes
+  become: yes
+  when:
+    - ansible_pkg_mgr == "yum"
+
+- name: bastion-ssh | Ensure to install openssh-server (YUM)
+  yum:
+    name: openssh-server
+    state: latest
+  become: yes
+  when:
+    - ansible_pkg_mgr == "yum"
+
+- name: bastion-ssh | Copy sshd_config
+  copy:
+    src: files/sshd_config
+    dest: /etc/ssh/sshd_config
+    mode: 0644
+    owner: root
+    group: root
+  become: yes
+  notify: Restart sshd
+
+- name: bastion-ssh | Create ssh config
+  template:
+    src: config.j2
+    dest: ~/.ssh/config
+    mode: 0600
+  become: no
