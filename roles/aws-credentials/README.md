@@ -44,9 +44,9 @@ Example Playbook
 License
 -------
 
-BSD
+MIT
 
 Author Information
 ------------------
 
-Hayashi_Toshiki@ogis-ri.co.jp
+toshiki.hayashi ＠ outlook.com

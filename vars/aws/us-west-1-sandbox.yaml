@@ -25,7 +25,7 @@ aws_security_group:
       - proto: tcp
         ports: [443]
         cidr_ip: [158.201.127.1/32]
-        group_desc: ssh-from-ogis
+        group_desc: ssh-from-your-ip
       - proto: tcp
         ports: [22]
         cidr_ip:

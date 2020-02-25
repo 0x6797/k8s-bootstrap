@@ -1,7 +1,7 @@
 galaxy_info:
-  author: Hayashi_Toshiki@ogis-ri.co.jp
+  author: toshiki.hayashi ＠ outlook.com
   description: Kubernetes Bootstraping for AWS
-  company: OGIS-RI
+  company:
 
   # If the issue tracker for your role is not on github, uncomment the
   # next line and provide a value
@@ -14,7 +14,7 @@ galaxy_info:
   # - GPLv3
   # - Apache
   # - CC-BY
-  license: CC-BY
+  license: MIT
 
   min_ansible_version: 2.4
 

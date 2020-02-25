@@ -35,9 +35,9 @@ Kubernets(k8s) クラスターに必要な構成要素を作成するための P
 Requirement
 -----------
 
-- Python >= 2.6
+- Python >= 3.6
 - Git
-- Ansible >= 2.6
+- Ansible >= 2.9
 - AWS CLI
 
 Ansible をインストールする
@@ -46,8 +46,8 @@ Ansible をインストールする
 Playbook を実行するマシンに Ansible をインストールします。
 
 ```bash
-$ sudo yum install -y python python2-pip
-$ sudo pip install --user ansible
+$ sudo yum install -y python3 python3-pip
+$ sudo pip3 install --user ansible
 ```
 
 AWS | aws cli を実行する
